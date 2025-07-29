@@ -1,0 +1,327 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOSEN
+  MAHASISWA
+}
+
+enum SemesterType {
+  GANJIL
+  GENAP
+}
+
+enum RuanganType {
+  TEORI
+  PRAKTIKUM
+}
+
+enum Hari {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+  MINGGU
+}
+
+enum StatusPresensi {
+  HADIR
+  TIDAK_HADIR
+  IZIN
+  SAKIT
+  TERLAMBAT
+}
+
+enum TipePengajuan {
+  IZIN
+  SAKIT
+}
+
+enum StatusPengajuan {
+  DIPROSES
+  DISETUJUI
+  DITOLAK
+}
+
+enum AlatMode {
+  MASUK
+  PULANG
+  PRESENSI
+  REGISTRASI
+}
+
+enum AlatStatus {
+  AKTIF
+  NONAKTIF
+  ERROR
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id                  String  @id @default(cuid())
+  uid                 String? @unique
+  name                String
+  email               String  @unique
+  password            String?
+  alamat              String?
+  no_hp               String?
+  foto                String?
+  nim                 String? @unique
+  nip                 String? @unique
+  is_profile_complete Boolean @default(false)
+  role                Role    @default(MAHASISWA)
+  gender              String?
+
+  semesterId String?
+  prodiId    String?
+  golonganId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  semester Semester?     @relation(fields: [semesterId], references: [id])
+  prodi    ProgramStudi? @relation(fields: [prodiId], references: [id])
+  golongan Golongan?     @relation(fields: [golonganId], references: [id])
+
+  laporans           LaporanMahasiswa[] @relation("LaporanDariUser")
+  presensi           PresensiKuliah[]   @relation
+  pengajuanIzin      PengajuanIzin[]    @relation
+  notifikasiDiterima Notifikasi[]       @relation("NotifikasiUntukUser")
+  notifikasiDikirim  Notifikasi[]       @relation("NotifikasiDariSender")
+  jadwalMengajar     JadwalKuliah[]     @relation
+  jadwalDiikuti      PesertaKuliah[]    @relation
+
+  account Account[]
+  session Session[]
+
+  @@map("user")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Semester {
+  id   String       @id @default(cuid())
+  name String       @unique
+  tipe SemesterType
+
+  // Relasi
+  jadwal_kuliah JadwalKuliah[]
+  user          User[]
+  Golongan      Golongan[]
+}
+
+model Ruangan {
+  id   String      @id @default(cuid())
+  kode String      @unique
+  name String
+  type RuanganType
+
+  // Relasi
+  jadwal_kuliah JadwalKuliah[]
+  alat_presensi AlatPresensi[]
+}
+
+model ProgramStudi {
+  id   String  @id @default(cuid())
+  name String  @unique
+  slug String? @unique
+
+  // Relasi
+  users         User[]
+  golongan      Golongan[]
+  jadwal_kuliah JadwalKuliah[]
+}
+
+model PresensiKuliah {
+  id             String         @id @default(cuid())
+  waktu_presensi DateTime?      @default(now())
+  status         StatusPresensi
+  keterangan     String?
+
+  mahasiswaId    String
+  matkulId       String
+  jadwalKuliahId String
+
+  mahasiswa     User         @relation(fields: [mahasiswaId], references: [id], onDelete: Cascade)
+  mata_kuliah   MataKuliah   @relation(fields: [matkulId], references: [id])
+  jadwal_kuliah JadwalKuliah @relation(fields: [jadwalKuliahId], references: [id], onDelete: Cascade)
+}
+
+model PengajuanIzin {
+  id             String          @id @default(cuid())
+  tanggal_izin   DateTime
+  tipe_pengajuan TipePengajuan
+  pesan          String          @db.Text
+  file_bukti     String?
+  status         StatusPengajuan @default(DIPROSES)
+  catatan_dosen  String?         @db.Text
+
+  mahasiswaId    String
+  jadwalKuliahId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mahasiswa     User         @relation(fields: [mahasiswaId], references: [id], onDelete: Cascade)
+  jadwal_kuliah JadwalKuliah @relation(fields: [jadwalKuliahId], references: [id])
+}
+
+model Notifikasi {
+  id         String    @id @default(cuid())
+  tipe       String
+  konten     String    @db.Text
+  url_tujuan String?
+  read_at    DateTime?
+
+  userId   String
+  senderId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User @relation("NotifikasiUntukUser", fields: [userId], references: [id], onDelete: Cascade)
+  sender User @relation("NotifikasiDariSender", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model MataKuliah {
+  id   String @id @default(cuid())
+  kode String @unique
+  name String
+
+  jadwal_kuliah JadwalKuliah[]
+  presensi      PresensiKuliah[]
+}
+
+model LaporanMahasiswa {
+  id      String  @id @default(cuid())
+  tipe    String
+  pesan   String  @db.Text
+  status  String  @default("Belum Ditangani")
+  balasan String? @db.Text
+
+  userId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("LaporanDariUser", fields: [userId], references: [id], onDelete: Cascade) // BENAR: onDelete di sisi anak
+}
+
+model JadwalKuliah {
+  id             String  @id @default(cuid())
+  is_kelas_besar Boolean @default(false)
+  hari           Hari
+  jam_mulai      String
+  jam_selesai    String
+
+  dosenId    String?
+  matkulId   String
+  semesterId String
+  prodiId    String
+  ruanganId  String
+
+  dosen         User?            @relation(fields: [dosenId], references: [id], onDelete: SetNull)
+  mata_kuliah   MataKuliah       @relation(fields: [matkulId], references: [id])
+  semester      Semester         @relation(fields: [semesterId], references: [id])
+  prodi         ProgramStudi     @relation(fields: [prodiId], references: [id])
+  golongans     Golongan[]       @relation("JadwalToGolongan")
+  ruangan       Ruangan          @relation(fields: [ruanganId], references: [id], onDelete: Restrict)
+  presensi      PresensiKuliah[]
+  pengajuanIzin PengajuanIzin[]
+  peserta       PesertaKuliah[]
+}
+
+model Golongan {
+  id         String @id @default(cuid())
+  name       String
+  prodiId    String
+  semesterId String
+
+  prodi         ProgramStudi   @relation(fields: [prodiId], references: [id])
+  semester      Semester?      @relation(fields: [semesterId], references: [id])
+  users         User[]
+  jadwal_kuliah JadwalKuliah[] @relation("JadwalToGolongan")
+
+  @@unique([prodiId, semesterId, name])
+}
+
+model AlatPresensi {
+  id           String     @id @default(cuid())
+  name         String
+  mode         AlatMode   @default(PRESENSI)
+  jadwal_nyala DateTime?
+  jadwal_mati  DateTime?
+  status       AlatStatus @default(NONAKTIF)
+
+  ruanganId String
+
+  ruangan           Ruangan @relation(fields: [ruanganId], references: [id])
+  targetMahasiswaId String?
+}
+
+model PesertaKuliah {
+  id String @id @default(cuid())
+
+  mahasiswaId    String
+  jadwalKuliahId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mahasiswa     User         @relation(fields: [mahasiswaId], references: [id], onDelete: Cascade)
+  jadwal_kuliah JadwalKuliah @relation(fields: [jadwalKuliahId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([mahasiswaId, jadwalKuliahId])
+}
