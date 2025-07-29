@@ -1,6 +1,7 @@
+import { AlatPresensi } from "@prisma/client";
 import { format } from "date-fns-tz";
 
-export function isAktifSekarang(alat) {
+export function isAktifSekarang(alat: AlatPresensi) {
   if (!alat.jadwal_nyala || !alat.jadwal_mati) return true;
 
   const now = new Date();

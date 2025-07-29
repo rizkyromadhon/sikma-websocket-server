@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 import { createServer } from "http";
-import prisma from "./lib/prisma.ts";
+import prisma from "./lib/prisma.js";
 import { isAktifSekarang } from "./lib/schedule-helper.js";
 
 const SOCKET_PORT = 3001;
@@ -67,18 +67,20 @@ wss.on("connection", (ws) => {
 
 server.listen(SOCKET_PORT, "0.0.0.0");
 
-const previousStatuses = {};
+// const previousStatuses = {};
+const previousStatuses: Record<string, string> = {};
 
 setInterval(async () => {
-  const semuaAlat = await prisma.alatPresensi.findMany({
-    select: {
-      id: true,
-      name: true,
-      mode: true,
-      jadwal_nyala: true,
-      jadwal_mati: true,
-    },
-  });
+  const semuaAlat = await prisma.alatPresensi.findMany();
+  // const semuaAlat = await prisma.alatPresensi.findMany({
+  //   select: {
+  //     id: true,
+  //     name: true,
+  //     mode: true,
+  //     jadwal_nyala: true,
+  //     jadwal_mati: true,
+  //   },
+  // });
 
   for (const alat of semuaAlat) {
     const statusBaru = isAktifSekarang(alat) ? "AKTIF" : "NONAKTIF";
@@ -99,9 +101,9 @@ setInterval(async () => {
       if (statusBaru === "AKTIF") {
         const configData = {
           event: "config-update",
-          alatId: alatTerbaru.id,
-          nama: alatTerbaru.name,
-          mode: alatTerbaru.mode,
+          alatId: alatTerbaru?.id,
+          nama: alatTerbaru?.name,
+          mode: alatTerbaru?.mode,
           status: statusBaru,
         };
 
@@ -116,9 +118,9 @@ setInterval(async () => {
       } else {
         const configData = {
           event: "config-update",
-          alatId: alatTerbaru.id,
-          nama: alatTerbaru.name,
-          mode: alatTerbaru.mode,
+          alatId: alatTerbaru?.id,
+          nama: alatTerbaru?.name,
+          mode: alatTerbaru?.mode,
           status: statusBaru,
         };
 
